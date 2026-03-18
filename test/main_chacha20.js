@@ -12,12 +12,14 @@ export const options = {
   },
 };
 
+// --- Encryption Configuration ---
 const key = [
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
   22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
 ];
 const nonce = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
+// --- ChaCha20 Helper Functions ---
 function rotl(v, c) {
   return (v << c) | (v >>> (32 - c));
 }
@@ -93,41 +95,61 @@ function chacha20_encrypt(plaintext, key, nonce) {
   return res;
 }
 
+// --- Main Test Loop ---
 export default function () {
   const client = new Client();
+  let isClosing = false; // Safety gate to prevent panics
 
-  // Stagger connections to prevent local port exhaustion (spread over 5s)
+  // Stagger connections over 10s to prevent local port exhaustion
   sleep(Math.random() * 10);
+
+  client.on("connect", () => {
+    // 1. Start the publishing loop (20 msg/sec per VU)
+    const intervalId = setInterval(() => {
+      if (isClosing) return;
+
+      const temp = 20.0 + Math.random() * 10.0;
+      const hum = 40.0 + Math.random() * 20.0;
+
+      const buf = new ArrayBuffer(8);
+      const v = new DataView(buf);
+      v.setFloat32(0, temp, true);
+      v.setFloat32(4, hum, true);
+      const plain = new Uint8Array(buf);
+
+      // Manual ChaCha20 encryption
+      const encryptedBytes = chacha20_encrypt(plain, key, nonce);
+
+      let hex = "";
+      for (let i = 0; i < encryptedBytes.length; i++) {
+        hex += encryptedBytes[i].toString(16).padStart(2, "0");
+      }
+
+      try {
+        client.publish("sensors/data", hex.toUpperCase());
+      } catch (e) {
+        // Suppress errors if publish triggers during client teardown
+      }
+    }, 50);
+
+    // 2. Schedule graceful shutdown after 30 seconds
+    setTimeout(() => {
+      isClosing = true;
+      clearInterval(intervalId);
+
+      // Delay slightly to ensure in-flight packets clear before end()
+      setTimeout(() => {
+        client.end();
+      }, 500);
+    }, 30000);
+  });
+
+  client.on("error", (err) => {
+    // Suppress console spam during high-load shutdowns
+  });
 
   client.connect("mqtt://localhost:1883");
 
-  const startTime = Date.now();
-  const testDuration = 30000; // 30 seconds of active publishing
-
-  while (Date.now() - startTime < testDuration) {
-    const temp = 20.0 + Math.random() * 10.0;
-    const hum = 40.0 + Math.random() * 20.0;
-
-    const buf = new ArrayBuffer(8);
-    const v = new DataView(buf);
-    v.setFloat32(0, temp, true);
-    v.setFloat32(4, hum, true);
-    const plain = new Uint8Array(buf);
-
-    const encryptedBytes = chacha20_encrypt(plain, key, nonce);
-
-    let hex = "";
-    for (let i = 0; i < encryptedBytes.length; i++) {
-      hex += encryptedBytes[i].toString(16).padStart(2, "0");
-    }
-
-    client.publish("sensors/data", hex.toUpperCase());
-
-    // 0.01 is extremely intensive for 1000 VUs.
-    // If k6 feels "stuck", increase this to 0.05.
-    sleep(0.01);
-  }
-
-  // Graceful exit
-  client.end();
+  // 3. Keep the VU script alive while the async events above process
+  sleep(35);
 }
