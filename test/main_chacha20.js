@@ -2,11 +2,14 @@ import { Client } from "k6/x/mqtt";
 import { sleep } from "k6";
 
 export const options = {
-  stages: [
-    { duration: "10s", target: 500 }, // Ramp up to 500 VUs
-    { duration: "20s", target: 1000 }, // Ramp up to 1000 VUs
-    { duration: "10s", target: 0 }, // Graceful ramp down
-  ],
+  scenarios: {
+    my_mqtt_test: {
+      executor: "per-vu-iterations",
+      vus: 1000,
+      iterations: 1, // Each VU runs the loop once then exits
+      maxDuration: "1m", // Safety timeout
+    },
+  },
 };
 
 const key = [
@@ -93,14 +96,13 @@ function chacha20_encrypt(plaintext, key, nonce) {
 export default function () {
   const client = new Client();
 
-  // Stagger connections to prevent local port exhaustion
-  sleep(Math.random() * 3);
+  // Stagger connections to prevent local port exhaustion (spread over 5s)
+  sleep(Math.random() * 10);
 
   client.connect("mqtt://localhost:1883");
 
-  // Keep this iteration alive for the duration of the VU's life
   const startTime = Date.now();
-  const testDuration = 30000; // 30 seconds
+  const testDuration = 30000; // 30 seconds of active publishing
 
   while (Date.now() - startTime < testDuration) {
     const temp = 20.0 + Math.random() * 10.0;
@@ -119,13 +121,13 @@ export default function () {
       hex += encryptedBytes[i].toString(16).padStart(2, "0");
     }
 
-    // Pass only required arguments to avoid type conversion errors
-    console.log(hex.toUpperCase());
     client.publish("sensors/data", hex.toUpperCase());
 
-    // Control message rate (0.01 = ~100 msgs/sec per VU)
+    // 0.01 is extremely intensive for 1000 VUs.
+    // If k6 feels "stuck", increase this to 0.05.
     sleep(0.01);
   }
 
+  // Graceful exit
   client.end();
 }
