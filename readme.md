@@ -40,3 +40,23 @@ Execution,Iterations,200,3.39 /s
 Network,Data Received,0 B,0 B/s
 ,Data Sent,15 MB,252 kB/s
 
+Gemini berkata
+ChaCha20
+Component, Algorithm / Specification, Description
+Symmetric Encryption, ChaCha20, Stream cipher utilizing a 256-bit key for high-performance encryption.
+Cipher Type, Stream Cipher, Generates a pseudo-random keystream XORed directly with the plaintext.
+Padding, None, Not required as stream ciphers operate on individual bytes rather than fixed blocks.
+Nonce (IV), 96-bit (12-byte), Unique initialization vector to ensure different ciphertext for identical plaintext.
+Data Encoding, Hexadecimal, Ciphertext is transmitted as Hex strings to maintain compatibility across protocols.
+Binary Format, IEEE 754 (Float32), Standard 4-byte representation for floating-point environmental data.
+Byte Order, Little Endian, The least significant byte is processed first to match modern CPU architectures.
+
+Category, Metric, Total / Value, Rate / Distribution
+MQTT (Custom), MQTT Calls, "241,472", "7,317.04 /s"
+, Messages Sent, "241,272", "7,310.98 /s"
+Execution, Iterations, 100, 3.03 /s
+, Iteration Duration, —, "avg: 31.67s, min: 30s, med: 31.71s, max: 33s, p(90): 32.83s, p(95): 32.91s"
+, Active VUs, 100, "min: 1, max: 100"
+, Max VUs, 100, "min: 100, max: 100"
+Network, Data Received, 0 B, 0 B/s
+, Data Sent, 3.9 MB, 117 kB/s
