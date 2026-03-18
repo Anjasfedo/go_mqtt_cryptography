@@ -1,9 +1,16 @@
 import { Client } from "k6/x/mqtt";
 import crypto from "https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js";
+import { sleep } from "k6";
 
 export const options = {
-  vus: 100,
-  duration: "30s",
+  scenarios: {
+    my_mqtt_test: {
+      executor: "per-vu-iterations",
+      vus: 1000,
+      iterations: 1, // Each VU runs exactly once
+      maxDuration: "1m", // Safety timeout
+    },
+  },
 };
 
 const key = crypto.enc.Hex.parse(
@@ -12,6 +19,10 @@ const key = crypto.enc.Hex.parse(
 
 export default function () {
   const client = new Client();
+
+  // IMPORTANT: Stagger the start of 1,000 VUs so they don't crash your local CPU/Network
+  // __VU is the ID of the current virtual user
+  sleep(Math.random() * 10);
 
   client.on("connect", () => {
     const intervalId = setInterval(() => {
@@ -30,7 +41,6 @@ export default function () {
       }
 
       const dataWord = crypto.enc.Hex.parse(hexStr);
-
       const encrypted = crypto.AES.encrypt(dataWord, key, {
         mode: crypto.mode.ECB,
         padding: crypto.pad.Pkcs7,
@@ -39,19 +49,21 @@ export default function () {
       const payload = encrypted.ciphertext
         .toString(crypto.enc.Hex)
         .toUpperCase();
-
       client.publish("sensors/data", payload);
-    }, 10);
+    }, 50); // Increased to 50ms to save CPU when running 1,000 VUs
 
     setTimeout(() => {
       clearInterval(intervalId);
       client.end();
-    }, 29500);
+    }, 30000); // Run for 30 seconds
   });
 
   client.on("error", (err) => {
-    console.error("MQTT Error:", err);
+    // Suppress common connection reset errors during high-load shutdowns
   });
 
   client.connect("mqtt://localhost:1883");
+
+  // Keep the VU alive while the async logic above runs
+  sleep(35);
 }

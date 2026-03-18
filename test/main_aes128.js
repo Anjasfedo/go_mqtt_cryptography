@@ -2,8 +2,11 @@ import { Client } from "k6/x/mqtt";
 import crypto from "https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js";
 
 export const options = {
-  vus: 100,
-  duration: "30s",
+  stages: [
+    { duration: "10s", target: 500 }, // Ramp up to 500 VUs
+    { duration: "20s", target: 1000 }, // Ramp up to 1000 VUs
+    { duration: "10s", target: 0 }, // Graceful ramp down
+  ],
 };
 
 const key = crypto.enc.Hex.parse("000102030405060708090A0B0C0D0E0F");

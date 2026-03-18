@@ -2,9 +2,11 @@ import { Client } from "k6/x/mqtt";
 import { sleep } from "k6";
 
 export const options = {
-  vus: 100,
-  duration: "30s",
-  gracefulStop: "5s", // Gives VUs time to finish their teardown
+  stages: [
+    { duration: "10s", target: 500 }, // Ramp up to 500 VUs
+    { duration: "20s", target: 1000 }, // Ramp up to 1000 VUs
+    { duration: "10s", target: 0 }, // Graceful ramp down
+  ],
 };
 
 const key = [
@@ -161,6 +163,7 @@ export default function () {
       hexStr += finalPayload[i].toString(16).padStart(2, "0");
     }
 
+    console.log(hexStr.toUpperCase());
     client.publish("sensors/data", hexStr.toUpperCase());
     sleep(0.01);
   }

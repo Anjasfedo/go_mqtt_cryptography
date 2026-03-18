@@ -2,8 +2,11 @@ import { Client } from "k6/x/mqtt";
 import { sleep } from "k6";
 
 export const options = {
-  vus: 100,
-  duration: "30s",
+  stages: [
+    { duration: "10s", target: 500 }, // Ramp up to 500 VUs
+    { duration: "20s", target: 1000 }, // Ramp up to 1000 VUs
+    { duration: "10s", target: 0 }, // Graceful ramp down
+  ],
 };
 
 const key = [
@@ -117,6 +120,7 @@ export default function () {
     }
 
     // Pass only required arguments to avoid type conversion errors
+    console.log(hex.toUpperCase());
     client.publish("sensors/data", hex.toUpperCase());
 
     // Control message rate (0.01 = ~100 msgs/sec per VU)
