@@ -9,12 +9,10 @@ export const options = {
 const key = crypto.enc.Hex.parse("000102030405060708090A0B0C0D0E0F");
 
 export default function () {
-  // 1. Initialize without positional arguments
   const client = new Client();
 
-  // 2. Set up the connect event handler
   client.on("connect", () => {
-    // 3. Use setInterval instead of sleep() for continuous publishing
+    // 1. Start the publishing loop
     const intervalId = setInterval(() => {
       const temp = 20.0 + Math.random() * 10.0;
       const hum = 40.0 + Math.random() * 20.0;
@@ -41,18 +39,19 @@ export default function () {
         .toString(crypto.enc.Hex)
         .toUpperCase();
 
-      // Publish the payload
       client.publish("sensors/data", payload);
-    }, 10); // 10ms interval replaces your sleep(0.01)
+    }, 10);
 
-    // Optional: Stop the interval and close connection when the test duration ends
-    // k6 will technically tear down the VU at the end of the duration anyway.
+    // 2. Schedule a graceful shutdown at 29.5 seconds
+    setTimeout(() => {
+      clearInterval(intervalId); // Stop publishing
+      client.end(); // Send MQTT DISCONNECT and close the socket
+    }, 29500);
   });
 
   client.on("error", (err) => {
     console.error("MQTT Error:", err);
   });
 
-  // 4. Connect using a standard URI string
   client.connect("mqtt://localhost:1883");
 }
