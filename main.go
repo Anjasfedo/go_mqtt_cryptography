@@ -1,47 +1,90 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
-	"math/rand"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
+	mqtt "github.com/mochi-mqtt/server/v2"
+	"github.com/mochi-mqtt/server/v2/hooks/auth"
+	"github.com/mochi-mqtt/server/v2/listeners"
+	"github.com/mochi-mqtt/server/v2/packets"
 )
 
-type SensorData struct {
-	SensorID  string  `json:"sensor_id"`
-	Temp      float64 `json:"temp"`
-	HeartRate int     `json:"heart_rate"`
-	Oxygen    int     `json:"oxygen"`
+type ZstdDynamicHook struct {
+	mqtt.HookBase
+	decoders map[byte]*zstd.Decoder
+}
+
+func (h *ZstdDynamicHook) ID() string {
+	return "zstd-dynamic-hook"
+}
+
+func (h *ZstdDynamicHook) Provides(b byte) bool {
+	return bytes.Contains([]byte{mqtt.OnPublish}, []byte{b})
+}
+
+func (h *ZstdDynamicHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.Packet, error) {
+	if pk.TopicName == "sensors/dictionary" && len(pk.Payload) > 1 {
+		version := pk.Payload[0]
+		dictBytes := pk.Payload[1:]
+
+		decoder, err := zstd.NewReader(nil, zstd.WithDecoderDicts(dictBytes))
+		if err != nil {
+			fmt.Printf("[Server] Error creating decoder v%d: %v\n", version, err)
+			return pk, nil
+		}
+		h.decoders[version] = decoder
+		fmt.Printf("[Server] Successfully loaded Dictionary v%d (%d bytes).\n", version, len(dictBytes))
+
+	} else if pk.TopicName == "sensors/data" && len(pk.Payload) > 1 {
+		version := pk.Payload[0]
+		compressedData := pk.Payload[1:]
+
+		decoder, exists := h.decoders[version]
+		if !exists {
+			fmt.Printf("[Server] Unknown dictionary version: %d\n", version)
+			return pk, nil
+		}
+
+		startTime := time.Now()
+		decompressedData, err := decoder.DecodeAll(compressedData, nil)
+		if err != nil {
+			fmt.Printf("[Server] Decompression error: %v\n", err)
+			return pk, nil
+		}
+
+		processingDelay := time.Since(startTime)
+		fmt.Printf("[Server] Decompressed with dict v%d. Compressed: %d B, Decompressed: %d B, Delay: %v\n", version, len(compressedData), len(decompressedData), processingDelay)
+	}
+	return pk, nil
 }
 
 func main() {
-	reads := []int{20, 50, 100}
+	server := mqtt.New(nil)
+	_ = server.AddHook(new(auth.AllowHook), nil)
 
-	for _, count := range reads {
-		var readings []SensorData
-		for i := 0; i < count; i++ {
-			readings = append(readings, SensorData{
-				SensorID:  fmt.Sprintf("S%d", i+1),
-				Temp:      36.0 + rand.Float64(),
-				HeartRate: 60 + rand.Intn(40),
-				Oxygen:    95 + rand.Intn(5),
-			})
-		}
-
-		originalData, _ := json.Marshal(readings)
-
-		encoder, _ := zstd.NewWriter(nil)
-		compressedData := encoder.EncodeAll(originalData, make([]byte, 0, len(originalData)))
-		encoder.Close()
-
-		origSize := float64(len(originalData))
-		compSize := float64(len(compressedData))
-		dcr := ((origSize - compSize) / origSize) * 100
-
-		fmt.Printf("Number of reads: %d\n", count)
-		fmt.Printf("Original Size: %d bytes\n", int(origSize))
-		fmt.Printf("Compressed Size: %d bytes\n", int(compSize))
-		fmt.Printf("Data Compression Ratio: %.2f%%\n\n", dcr)
+	hook := &ZstdDynamicHook{
+		decoders: make(map[byte]*zstd.Decoder),
 	}
+	_ = server.AddHook(hook, nil)
+
+	tcp := listeners.NewTCP(listeners.Config{
+		ID:      "t1",
+		Address: ":1883",
+	})
+	_ = server.AddListener(tcp)
+
+	go func() {
+		_ = server.Serve()
+	}()
+
+	fmt.Println("Mochi MQTT Server listening on :1883. Ready for dynamic dictionaries.")
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	<-sigs
 }

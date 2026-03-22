@@ -40,7 +40,6 @@ Execution,Iterations,200,3.39 /s
 Network,Data Received,0 B,0 B/s
 ,Data Sent,15 MB,252 kB/s
 
-Gemini berkata
 ChaCha20
 Component, Algorithm / Specification, Description
 Symmetric Encryption, ChaCha20, Stream cipher utilizing a 256-bit key for high-performance encryption.
