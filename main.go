@@ -59,7 +59,8 @@ func (h *ZstdDynamicHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets
 		}
 
 		processingDelay := time.Since(startTime)
-		fmt.Printf("[Server] Decompressed with dict v%d. Compressed: %d B, Decompressed: %d B, Delay: %v\n", version, len(compressedData), len(decompressedData), processingDelay)
+
+		fmt.Printf("[Server] Decompressed with dict v%d. Compressed: %d B, Decompressed: %d B, Delay: %d microseconds\n", version, len(compressedData), len(decompressedData), processingDelay.Microseconds())
 	}
 	return pk, nil
 }

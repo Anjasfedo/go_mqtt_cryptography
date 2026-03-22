@@ -24,7 +24,7 @@ def generate_sample(count):
         })
     return json.dumps(readings).encode('utf-8')
 
-scenarios = [20, 50, 100]
+scenarios = [20, 50, 100, 250, 500, 1000]
 current_version = 1
 
 for count in scenarios:
@@ -35,7 +35,7 @@ for count in scenarios:
         samples.append(generate_sample(count))
         
     print("Training dictionary locally...")
-    trained_dict = zstd.train_dictionary(8192, samples)
+    trained_dict = zstd.train_dictionary(32768, samples)
     dict_bytes = trained_dict.as_bytes()
     
     dict_payload = bytes([current_version]) + dict_bytes
@@ -49,12 +49,27 @@ for count in scenarios:
     compressed_data = cctx.compress(new_data)
     
     payload = bytes([current_version]) + compressed_data
-    client.publish("sensors/data", payload)
     
+    start_time = time.time()
+    
+    msg_info = client.publish("sensors/data", payload)
+    msg_info.wait_for_publish()
+    
+    end_time = time.time()
+    
+    transmission_time_ms = (end_time - start_time) * 1000
+    
+    throughput = 0
+    if transmission_time_ms > 0:
+        throughput = len(payload) / transmission_time_ms
+        
     orig_size = len(new_data)
     comp_size = len(compressed_data)
     dcr = ((orig_size - comp_size) / orig_size) * 100
+    
     print(f"Result: Original: {orig_size} B, Compressed: {comp_size} B, DCR: {dcr:.2f}%")
+    print(f"Transmission Time: {transmission_time_ms:.2f} ms")
+    print(f"Throughput: {throughput:.2f} Bytes/ms")
     
     current_version += 1
     time.sleep(2)
