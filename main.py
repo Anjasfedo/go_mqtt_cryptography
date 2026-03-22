@@ -24,6 +24,45 @@ def generate_sample(count):
         })
     return json.dumps(readings).encode('utf-8')
 
+# def generate_sample(count):
+#     readings = []
+#     # Base timestamp to simulate real-time data sequence
+#     current_time = time.time()
+    
+#     for i in range(count):
+#         # Realistic healthcare ranges
+#         temp = round(36.1 + random.uniform(-0.5, 0.5), 2)
+#         hr = int(70 + random.uniform(-10, 20))
+#         ox = int(96 + random.uniform(-2, 3))
+        
+#         # Introduce occasional anomalies (1% chance) to simulate "original" data variability
+#         if random.random() < 0.01:
+#             temp += 2.0  # Fever spike
+#             hr += 30     # Tachycardia simulation
+#             ox -= 5      # Hypoxia simulation
+
+#         # Determine status based on readings
+#         status = "normal"
+#         if temp > 37.5 or hr > 100 or ox < 94:
+#             status = "warning"
+#         if temp > 39.0 or hr > 130 or ox < 90:
+#             status = "critical"
+
+#         readings.append({
+#             "sensor_id": f"dev-node-{1000 + (i % 5)}", # Multiple readings per node
+#             "timestamp": round(current_time + i, 3),   # Sequential timestamps
+#             "data": {
+#                 "temperature": {"value": temp, "unit": "Celsius"},
+#                 "heart_rate": {"value": hr, "unit": "bpm"},
+#                 "oxygen": {"value": ox, "unit": "percentage"}
+#             },
+#             "status": status,
+#             "battery_level": round(random.uniform(15, 99), 1), # IoT device metadata
+#             "accuracy_score": round(random.uniform(0.95, 0.99), 2)
+#         })
+        
+#     return json.dumps(readings).encode('utf-8')
+
 scenarios = [20, 50, 100, 250, 500, 1000]
 current_version = 1
 
