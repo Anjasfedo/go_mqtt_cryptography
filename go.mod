@@ -6,6 +6,7 @@ require github.com/mochi-mqtt/server/v2 v2.7.9
 
 require (
 	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rs/xid v1.4.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
