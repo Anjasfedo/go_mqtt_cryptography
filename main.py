@@ -14,11 +14,11 @@ client.loop_start()
 time.sleep(1)
 
 def generate_single(sensor_id):
+    # DHT22 Profile: Temperature and Humidity
     reading = {
-        "sensor_id": f"S{sensor_id}",
-        "temp": round(36.0 + random.random(), 2),
-        "heart_rate": int(60 + random.random() * 40),
-        "oxygen": int(95 + random.random() * 5)
+        "device_id": f"DHT22_{sensor_id}",
+        "temperature": round(20.0 + random.random() * 15, 2),
+        "humidity": round(40.0 + random.random() * 30, 2)
     }
     return json.dumps(reading).encode('utf-8')
 
