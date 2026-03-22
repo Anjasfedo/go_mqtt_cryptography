@@ -29,7 +29,9 @@ func (h *ZstdDynamicHook) Provides(b byte) bool {
 }
 
 func (h *ZstdDynamicHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.Packet, error) {
-	if pk.TopicName == "sensors/dictionary" && len(pk.Payload) > 1 {
+	if pk.TopicName == "sensors/raw" {
+		fmt.Printf("[Server] Received raw read: %d bytes\n", len(pk.Payload))
+	} else if pk.TopicName == "sensors/dictionary" && len(pk.Payload) > 1 {
 		version := pk.Payload[0]
 		dictBytes := pk.Payload[1:]
 
@@ -39,15 +41,14 @@ func (h *ZstdDynamicHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets
 			return pk, nil
 		}
 		h.decoders[version] = decoder
-		fmt.Printf("[Server] Successfully loaded Dictionary v%d (%d bytes).\n", version, len(dictBytes))
-
+		fmt.Printf("[Server] Loaded Dictionary v%d (%d bytes)\n", version, len(dictBytes))
 	} else if pk.TopicName == "sensors/data" && len(pk.Payload) > 1 {
 		version := pk.Payload[0]
 		compressedData := pk.Payload[1:]
 
 		decoder, exists := h.decoders[version]
 		if !exists {
-			fmt.Printf("[Server] Unknown dictionary version: %d\n", version)
+			fmt.Printf("[Server] Unknown dictionary v%d\n", version)
 			return pk, nil
 		}
 
@@ -57,10 +58,9 @@ func (h *ZstdDynamicHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets
 			fmt.Printf("[Server] Decompression error: %v\n", err)
 			return pk, nil
 		}
-
 		processingDelay := time.Since(startTime)
 
-		fmt.Printf("[Server] Decompressed with dict v%d. Compressed: %d B, Decompressed: %d B, Delay: %d microseconds\n", version, len(compressedData), len(decompressedData), processingDelay.Microseconds())
+		fmt.Printf("[Server] Decompressed v%d | Comp: %d B | Raw: %d B | Delay: %d us\n", version, len(compressedData), len(decompressedData), processingDelay.Microseconds())
 	}
 	return pk, nil
 }
@@ -84,7 +84,7 @@ func main() {
 		_ = server.Serve()
 	}()
 
-	fmt.Println("Mochi MQTT Server listening on :1883. Ready for dynamic dictionaries.")
+	fmt.Println("Mochi MQTT Server listening on :1883. Ready.")
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	<-sigs
